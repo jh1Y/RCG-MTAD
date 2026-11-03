@@ -1,0 +1,26 @@
+{
+  "road": {
+    "image_size": 224,
+    "image_fusion_dim": 256,
+    "gate_temperature": 1.0,
+    "freeze_backbone": false,
+    "train_last_stage": false,
+    "pretrained": false
+  },
+  "inputs": {
+    "acc_length": 1024,
+    "road_acc_length": 256,
+    "imu_channels": 9,
+    "imu_length": 1,
+    "gyro_indices": [3, 4, 5],
+    "state_dim": 3
+  },
+  "tire": {
+    "use_road_probability": true,
+    "use_zroad_film": true,
+    "use_zroad_concat": false,
+    "acceleration_encoder_variant": "dual_rms",
+    "pressure_temperature_mode": "coupled"
+  },
+  "freeze_road_encoder": false
+}
