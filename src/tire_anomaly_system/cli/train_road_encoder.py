@@ -1,4 +1,4 @@
-"""Standalone road-encoder training, independent of tire classifier labels."""
+"""Standalone road-encoder training using the prepared four-state data."""
 
 from .train_model import parse_args, train
 

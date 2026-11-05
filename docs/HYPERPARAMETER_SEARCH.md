@@ -22,21 +22,23 @@
 
 ```bash
 # 1. 道路编码器选参：默认 30 组，结果保存到 outputs/hyperparameter_search/road。
-DATA_DIR=/path/to/TTSPD SENSOR_SUBDIR=sensor \
+DATA_DIR=/path/to/dataset \
   bash scripts/search_road_encoder.sh
 
 # 2. 完整模型选参：自动读取上一阶段的 best.json，所有试验使用相同道路初始化。
-DATA_DIR=/path/to/TTSPD SENSOR_SUBDIR=sensor \
+DATA_DIR=/path/to/dataset \
   bash scripts/search_model.sh
 ```
 
-数据目录使用现有目录名称即可，通过 `SENSOR_SUBDIR` 指定。
-也支持设置 `SAMPLES=/path/to/samples.npz` 或 CSV 清单，此时无需设置 `DATA_DIR`。
+默认数据根目录为项目内的 `Datasets`，可省略 `DATA_DIR`。
+目录采用 `{train,valid,test}/{pic,sensor}`，也兼容原项目的 images 图片目录。
+CSV 的 image_path 优先，缺失时沿用原项目按道路、时间和源样本分组的配对规则。
+搜索仅加载 train 和 valid；test 留待最终评估。
 
 若已有道路权重，完整模型选参可直接指定：
 
 ```bash
-DATA_DIR=/path/to/TTSPD ROAD_CHECKPOINT=/path/to/road_encoder.pt \
+DATA_DIR=/path/to/dataset ROAD_CHECKPOINT=/path/to/road_encoder.pt \
   bash scripts/search_model.sh
 ```
 
@@ -48,25 +50,25 @@ DATA_DIR=/path/to/TTSPD ROAD_CHECKPOINT=/path/to/road_encoder.pt \
 
 ```bash
 # 遍历默认的全部 324 组；grid 模式忽略 TRIALS。
-DATA_DIR=/path/to/TTSPD SEARCH_MODE=grid \
+DATA_DIR=/path/to/dataset SEARCH_MODE=grid \
   bash scripts/search_road_encoder.sh
 
 # 将完整模型预算改为 50 组，并使用独立输出目录。
-DATA_DIR=/path/to/TTSPD TRIALS=50 OUTPUT_DIR=outputs/model_search_50 \
+DATA_DIR=/path/to/dataset TRIALS=50 OUTPUT_DIR=outputs/model_search_50 \
   bash scripts/search_model.sh
 
 # 在表中范围内自定义候选。
-DATA_DIR=/path/to/TTSPD EPOCHS_GRID=100,150 BATCH_SIZE_GRID=64,128 \
+DATA_DIR=/path/to/dataset EPOCHS_GRID=100,150 BATCH_SIZE_GRID=64,128 \
   WEIGHT_DECAY_GRID=1e-5,1e-4 INITIAL_LR_GRID=1e-4,1e-3 MIN_LR_GRID=1e-6,1e-5 \
   TRIALS=16 OUTPUT_DIR=outputs/road_search_custom \
   bash scripts/search_road_encoder.sh
 
 # 只写计划、打印命令；不加载模型或开始训练。使用独立预览目录。
-DATA_DIR=/path/to/TTSPD DRY_RUN=1 OUTPUT_DIR=outputs/road_search_preview \
+DATA_DIR=/path/to/dataset DRY_RUN=1 OUTPUT_DIR=outputs/road_search_preview \
   bash scripts/search_road_encoder.sh
 
 # 完整模型也可预览命令；预览模式不会加载指定的道路权重文件。
-DATA_DIR=/path/to/TTSPD ROAD_CHECKPOINT=/path/to/road_encoder.pt \
+DATA_DIR=/path/to/dataset ROAD_CHECKPOINT=/path/to/road_encoder.pt \
   DRY_RUN=1 OUTPUT_DIR=outputs/model_search_preview \
   bash scripts/search_model.sh
 ```

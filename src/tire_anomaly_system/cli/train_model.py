@@ -11,15 +11,14 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from tire_anomaly_system.data import ANOMALY_CLASS_NAMES
-from tire_anomaly_system.data.end_to_end import partition_dataset
+from tire_anomaly_system.data import ANOMALY_CLASS_NAMES, make_loader
 from tire_anomaly_system.model_checkpoint import cpu_state, read_checkpoint, save_checkpoint
 from tire_anomaly_system.models import RCGMTAD
 from tire_anomaly_system.training.engine import (
-    fit_normalizers, make_loader, predict, prediction_metrics,
+    fit_normalizers, predict, prediction_metrics,
     resolve_device, run_epoch, write_predictions,
 )
-from .common import add_data_arguments, build_dataset, initialize_road, training_config
+from .common import add_data_arguments, build_datasets, initialize_road, training_config
 
 
 def parse_args(argv=None, *, stage="joint"):
@@ -78,8 +77,8 @@ def train(args, *, stage="joint", image_backbone=None):
         raise ValueError("Road pretraining requires a trainable road encoder")
     if config.freeze_road_encoder and not args.road_checkpoint:
         raise ValueError("Freezing the road encoder requires --road-checkpoint")
-    dataset = build_dataset(args, config)
-    partitions = partition_dataset(dataset)
+    splits = ("train", "valid", "test") if args.evaluate_test else ("train", "valid")
+    datasets = build_datasets(args, config, splits)
     model = RCGMTAD(config, image_backbone=image_backbone)
     keep_road_normalizer = initialize_road(model, args.road_checkpoint)
     initialization = {}
@@ -95,14 +94,13 @@ def train(args, *, stage="joint", image_backbone=None):
         initialization = {"tire_loaded_keys": len(report["loaded"]),
                           "tire_classifier_reinitialized": not compatible_classes}
         print(json.dumps(initialization))
-    fit_normalizers(model, dataset, partitions["train"], device=device,
+    fit_normalizers(model, datasets["train"], device=device,
                     batch_size=args.batch_size, workers=args.num_workers, stage=stage,
                     keep_road_normalizer=keep_road_normalizer)
-    loaders = {name: make_loader(dataset, indices, batch_size=args.batch_size,
+    loaders = {name: make_loader(dataset, batch_size=args.batch_size,
                                  workers=args.num_workers, shuffle=name == "train", seed=args.seed)
-               for name, indices in partitions.items()
-               if len(indices) and (name != "test" or args.evaluate_test)}
-    rows = [dataset.metadata(int(index)) for index in partitions["train"]]
+               for name, dataset in datasets.items()}
+    rows = [datasets["train"].metadata(index) for index in range(len(datasets["train"]))]
     road_criterion = torch.nn.CrossEntropyLoss(weight=class_weights([row["road_label"] for row in rows], device))
     tire_criterion = torch.nn.CrossEntropyLoss(weight=class_weights([row["anomaly_class"] for row in rows], device)) if stage == "joint" else None
     groups = [{"params": [p for p in model.road_encoder.parameters() if p.requires_grad],
@@ -125,9 +123,9 @@ def train(args, *, stage="joint", image_backbone=None):
         kwargs = dict(stage=stage, road_criterion=road_criterion, tire_criterion=tire_criterion,
                       road_loss_weight=args.road_loss_weight)
         train_metrics = run_epoch(model, loaders["train"], device, optimizer=optimizer, **kwargs)
-        val_metrics = run_epoch(model, loaders["val"], device, **kwargs)
+        val_metrics = run_epoch(model, loaders["valid"], device, **kwargs)
         record = {"epoch": epoch, "learning_rates": learning_rates,
-                  "train": train_metrics, "val": val_metrics}
+                  "train": train_metrics, "valid": val_metrics}
         history.append(record)
         print(json.dumps(record, ensure_ascii=False), flush=True)
         score = (val_metrics["road" if stage == "road" else "tire"]["macro_f1"], -val_metrics["loss"])
@@ -144,9 +142,9 @@ def train(args, *, stage="joint", image_backbone=None):
     model.load_state_dict(best_state, strict=True)
     model.to(device).eval()
     summary = {"stage": stage, "best_epoch": best_epoch, "seed": args.seed,
-               "epochs_completed": len(history), "validation": history[best_epoch - 1]["val"],
+               "epochs_completed": len(history), "validation": history[best_epoch - 1]["valid"],
                "test_evaluated": "test" in loaders,
-               "selection_partition": "val", "partition_sizes": {key: len(value) for key, value in partitions.items()},
+               "selection_partition": "valid", "partition_sizes": {key: len(value) for key, value in datasets.items()},
                "model_config": config.to_dict(), "training_arguments": vars(args),
                "initialization": initialization, "history": history}
     # The test partition participates only after validation has selected weights.

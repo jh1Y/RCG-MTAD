@@ -3,10 +3,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="${PROJECT_DIR:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
 PYTHON_BIN="${PYTHON_BIN:-python}"
-: "${DATA_DIR:?Set DATA_DIR to the TTSPD dataset root}"
+DATA_DIR="${DATA_DIR:-${PROJECT_DIR}/Datasets}"
 export PYTHONPATH="${PROJECT_DIR}/src${PYTHONPATH:+:${PYTHONPATH}}"
 "${PYTHON_BIN}" -m tire_anomaly_system.cli.train_road_encoder \
-  --data-dir "${DATA_DIR}" --sensor-subdir "${SENSOR_SUBDIR:-sensor}" \
+  --data-dir "${DATA_DIR}" \
   --config "${CONFIG:-${PROJECT_DIR}/configs/rcg_mtad.json}" \
   --output-dir "${OUTPUT_DIR:-${PROJECT_DIR}/outputs/road_encoder}" \
   --epochs "${EPOCHS:-200}" --patience "${PATIENCE:-20}" \

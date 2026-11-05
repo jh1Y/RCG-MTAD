@@ -41,12 +41,8 @@ REFERENCES = {
 def build_parser():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--stage", choices=("road", "joint"), required=True)
-    source = parser.add_mutually_exclusive_group(required=True)
-    source.add_argument("--data-dir")
-    source.add_argument("--samples")
-    parser.add_argument("--data-root")
-    parser.add_argument("--sensor-subdir", default="sensor")
-    parser.add_argument("--recursive-images", action="store_true")
+    parser.add_argument("--data-dir", default="Datasets",
+                        help="Prepared root with train/valid/test, each containing pic/ (or images/) and sensor/")
     parser.add_argument("--config")
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--mode", choices=("random", "grid"), default="random")
@@ -134,20 +130,18 @@ def resolve_initialization(args):
 def training_command(args, candidate, trial_dir):
     module = "train_road_encoder" if args.stage == "road" else "train_model"
     command = [sys.executable, "-u", "-m", f"tire_anomaly_system.cli.{module}"]
-    for name in ("data_dir", "samples", "data_root", "config", "road_checkpoint", "initial_tire_checkpoint"):
+    for name in ("data_dir", "config", "road_checkpoint", "initial_tire_checkpoint"):
         value = getattr(args, name)
         if value:
             command.extend(["--" + name.replace("_", "-"), _absolute(value)])
     command.extend([
-        "--sensor-subdir", args.sensor_subdir, "--output-dir", str(trial_dir),
+        "--output-dir", str(trial_dir),
         "--epochs", str(candidate.epochs), "--patience", str(candidate.epochs),
         "--batch-size", str(candidate.batch_size), "--weight-decay", str(candidate.weight_decay),
         "--lr", str(candidate.lr), "--lr-scheduler", "cosine", "--min-lr", str(candidate.min_lr),
         "--seed", str(args.seed), "--device", args.device, "--num-workers", str(args.num_workers),
         "--no-evaluate-test",
     ])
-    if args.recursive_images:
-        command.append("--recursive-images")
     command.append("--freeze-road-encoder" if args.freeze_road_encoder else "--no-freeze-road-encoder")
     if args.stage == "joint":
         # The table specifies a single initial LR for the complete model.
@@ -211,7 +205,7 @@ def _write_results(root, stage, results):
     if successful:
         winner = successful[0]
         _write_json(root / "best.json", {
-            "schema_version": SCHEMA, "stage": stage, "selection_partition": "val",
+            "schema_version": SCHEMA, "stage": stage, "selection_partition": "valid",
             "selection_metric": "road_macro_f1" if stage == "road" else "tire_macro_f1",
             "tie_break": "lower validation total loss, then trial ID",
             "test_evaluated": False, "optimizer": "AdamW", "scheduler": "cosine",
@@ -226,8 +220,8 @@ def search(args):
     candidates, space_size = plan_candidates(args)
     resolve_initialization(args)
     if not args.dry_run:
-        source = Path(args.data_dir or args.samples).expanduser()
-        if not (source.is_dir() if args.data_dir else source.is_file()):
+        source = Path(args.data_dir).expanduser()
+        if not source.is_dir():
             raise ValueError(f"Data source does not exist: {source}")
         for name in ("config", "road_checkpoint", "initial_tire_checkpoint"):
             value = getattr(args, name)

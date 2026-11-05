@@ -21,23 +21,13 @@ WEIGHT_DECAY_GRID="${WEIGHT_DECAY_GRID:-1e-5,1e-4,1e-3}"
 INITIAL_LR_GRID="${INITIAL_LR_GRID:-1e-5,1e-4,1e-3}"
 MIN_LR_GRID="${MIN_LR_GRID:-0,1e-6,1e-5}"
 
-source_args=()
-if [[ -n "${SAMPLES:-}" ]]; then
-  source_args+=(--samples "${SAMPLES}")
-else
-  : "${DATA_DIR:?Set DATA_DIR to the existing four-state TTSPD dataset root, or set SAMPLES}"
-  source_args+=(--data-dir "${DATA_DIR}")
-fi
-if [[ -n "${DATA_ROOT:-}" ]]; then
-  source_args+=(--data-root "${DATA_ROOT}")
-fi
+DATA_DIR="${DATA_DIR:-${PROJECT_DIR}/Datasets}"
 
 options=()
 if [[ "${RESUME:-1}" == "0" ]]; then options+=(--no-resume); fi
 if [[ "${CONTINUE_ON_ERROR:-1}" == "0" ]]; then options+=(--no-continue-on-error); fi
 if [[ "${INCLUDE_REFERENCE:-1}" == "0" ]]; then options+=(--no-include-reference); fi
 if [[ "${DRY_RUN:-0}" == "1" ]]; then options+=(--dry-run); fi
-if [[ "${RECURSIVE_IMAGES:-0}" == "1" ]]; then options+=(--recursive-images); fi
 
 if [[ "${STAGE}" == "joint" ]]; then
   if [[ -n "${ROAD_CHECKPOINT:-}" ]]; then
@@ -54,8 +44,7 @@ if [[ "${STAGE}" == "joint" ]]; then
 fi
 
 "${PYTHON_BIN}" -m tire_anomaly_system.cli.search_hyperparameters \
-  --stage "${STAGE}" "${source_args[@]}" \
-  --sensor-subdir "${SENSOR_SUBDIR:-sensor}" \
+  --stage "${STAGE}" --data-dir "${DATA_DIR}" \
   --config "${CONFIG:-${PROJECT_DIR}/configs/rcg_mtad.json}" \
   --output-dir "${OUTPUT_DIR:-${PROJECT_DIR}/outputs/hyperparameter_search/${STAGE}}" \
   --mode "${SEARCH_MODE:-random}" --trials "${TRIALS:-30}" \

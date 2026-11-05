@@ -3,7 +3,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="${PROJECT_DIR:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
 PYTHON_BIN="${PYTHON_BIN:-python}"
-: "${DATA_DIR:?Set DATA_DIR to the TTSPD dataset root}"
+DATA_DIR="${DATA_DIR:-${PROJECT_DIR}/Datasets}"
 export PYTHONPATH="${PROJECT_DIR}/src${PYTHONPATH:+:${PYTHONPATH}}"
 checkpoint_args=()
 if [[ -n "${ROAD_CHECKPOINT:-}" ]]; then
@@ -13,7 +13,7 @@ if [[ -n "${INITIAL_TIRE_CHECKPOINT:-}" ]]; then
   checkpoint_args+=(--initial-tire-checkpoint "${INITIAL_TIRE_CHECKPOINT}")
 fi
 "${PYTHON_BIN}" -m tire_anomaly_system.cli.train_model \
-  --data-dir "${DATA_DIR}" --sensor-subdir "${SENSOR_SUBDIR:-sensor}" \
+  --data-dir "${DATA_DIR}" \
   --config "${CONFIG:-${PROJECT_DIR}/configs/rcg_mtad.json}" "${checkpoint_args[@]}" \
   --output-dir "${OUTPUT_DIR:-${PROJECT_DIR}/outputs/rcg_mtad}" \
   --epochs "${EPOCHS:-200}" --patience "${PATIENCE:-20}" \

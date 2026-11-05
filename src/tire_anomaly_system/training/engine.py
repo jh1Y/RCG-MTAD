@@ -7,28 +7,13 @@ from pathlib import Path
 
 import numpy as np
 import torch
-from torch.utils.data import DataLoader, Subset
 
-from tire_anomaly_system.data import ANOMALY_CLASS_NAMES
-from tire_anomaly_system.data.end_to_end import collate_raw_samples
+from tire_anomaly_system.data import ANOMALY_CLASS_NAMES, make_loader
 from tire_anomaly_system.models.road_encoder import SOURCE_ROAD_CLASSES
 
 
 def resolve_device(value):
     return torch.device("cuda" if torch.cuda.is_available() else "cpu") if value == "auto" else torch.device(value)
-
-
-def make_loader(dataset, indices, *, batch_size=32, workers=0, shuffle=False, seed=42):
-    if batch_size < 2 and shuffle:
-        raise ValueError("Training batch_size must be at least 2 for road BatchNorm")
-    generator = torch.Generator().manual_seed(seed)
-    return DataLoader(
-        Subset(dataset, list(map(int, indices))), batch_size=batch_size,
-        num_workers=workers, shuffle=shuffle,
-        # A single training row cannot pass the road classifier's BatchNorm.
-        drop_last=bool(shuffle and len(indices) % batch_size == 1),
-        collate_fn=collate_raw_samples, generator=generator,
-    )
 
 
 def batch_inputs(batch, device):
@@ -56,13 +41,13 @@ def classification_metrics(truth, predicted, class_names):
 
 
 @torch.no_grad()
-def fit_normalizers(model, dataset, train_indices, *, device, batch_size=32, workers=0,
+def fit_normalizers(model, dataset, *, device, batch_size=32, workers=0,
                     stage="joint", keep_road_normalizer=False):
     """Fit only from train; P-T calibration is further restricted to healthy rows."""
     sensor_parts = {key: [] for key in ("tire_acc", "gyro", "vehicle_state")}
     labels = []
     # Metadata/sensors can be read without decoding all images twice.
-    for index in train_indices:
+    for index in range(len(dataset)):
         if hasattr(dataset, "sensor_item"):
             row = dataset.sensor_item(int(index))
         else:
@@ -85,7 +70,7 @@ def fit_normalizers(model, dataset, train_indices, *, device, batch_size=32, wor
         previous_mode = model.training
         model.eval()
         embeddings = []
-        loader = make_loader(dataset, train_indices, batch_size=batch_size, workers=workers)
+        loader = make_loader(dataset, batch_size=batch_size, workers=workers)
         for batch in loader:
             road = model.encode_road(*batch_inputs(batch, device))
             embeddings.append(road.zroad.detach().cpu())

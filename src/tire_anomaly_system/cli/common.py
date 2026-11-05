@@ -7,38 +7,29 @@ from dataclasses import replace
 from pathlib import Path
 
 from tire_anomaly_system.checkpoint import inspect_legacy_architecture, load_legacy_checkpoint
-from tire_anomaly_system.data.end_to_end import RawMultimodalDataset, TTSPDEndToEndDataset
+from tire_anomaly_system.data import MultimodalDataset
 from tire_anomaly_system.model_checkpoint import ROAD_SCHEMA, read_checkpoint
 from tire_anomaly_system.models import InputConfig, RCGMTADConfig, SOURCE_ROAD_CLASSES
 
 
 def add_data_arguments(parser):
-    source = parser.add_mutually_exclusive_group(required=True)
-    source.add_argument("--samples", help="Raw synchronized NPZ/PT archive or CSV manifest")
-    source.add_argument("--data-dir", help="TTSPD root containing images and aligned sensor CSVs")
-    parser.add_argument("--data-root", help="Root for relative paths inside --samples")
-    parser.add_argument("--sensor-subdir", default="sensor", help="Folder containing existing four-state aligned CSVs")
-    parser.add_argument("--recursive-images", action="store_true")
+    parser.add_argument("--data-dir", default="Datasets",
+                        help="Dataset root with train/valid/test; each has pic/ (or images/) and sensor/")
     parser.add_argument("--num-workers", type=int, default=0)
     parser.add_argument("--device", default="auto")
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--seed", type=int, default=42)
 
 
-def build_dataset(args, config, *, for_inference=False):
-    if args.samples:
-        return RawMultimodalDataset(
-            args.samples, data_root=args.data_root,
-            image_size=config.road.image_size, acc_length=config.inputs.acc_length,
-        )
+def build_datasets(args, config, splits, *, for_inference=False):
     if config.inputs.state_dim != 3:
-        raise ValueError("TTSPD adapter returns pressure, temperature and speed (3 scalars)")
-    return TTSPDEndToEndDataset(
-        args.data_dir, sensor_subdir=args.sensor_subdir,
+        raise ValueError("Sensor CSVs provide pressure, temperature and speed (3 scalars)")
+    return {split: MultimodalDataset(
+        args.data_dir, split,
         image_size=config.road.image_size, acc_length=config.inputs.acc_length,
         imu_channels=config.inputs.imu_channels, imu_length=config.inputs.imu_length,
-        recursive_images=args.recursive_images, for_inference=for_inference,
-    )
+        for_inference=for_inference,
+    ) for split in splits}
 
 
 def training_config(args):

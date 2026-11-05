@@ -1,6 +1,8 @@
 # RCG-MTAD
 
-训练和推理直接读取已有四状态数据（健康、漏气、过热、不平衡）及其既定划分。
+训练和推理直接读取 `Datasets/{train,valid,test}/{pic,sensor}` 下已准备好的四状态数据
+（健康、漏气、过热、不平衡），兼容原项目的 `images` 目录。图片优先通过 CSV
+的 `image_path` 对应，缺失路径时沿用原项目按道路和源样本分组的配对规则。
 
 ## 文件结构
 
@@ -11,12 +13,14 @@ RCG-MTAD/
 ├── README.md
 ├── pyproject.toml                         # 包配置、依赖与命令行入口
 ├── requirements.txt                      # 运行依赖
+├── Datasets/                             # 按集合目录读取已准备好的数据
+│   ├── train/                            # 训练集目录
+│   ├── valid/                            # 当前提供的验证集
+│   │   ├── images/                       # 路面图片，也兼容 pic/ 名称
+│   │   └── sensor/                       # 按道路和试验组织的对齐传感器 CSV
+│   └── test/                             # 测试集目录
 ├── configs/
 │   └── rcg_mtad.json                      # 整体模型与输入配置
-├── docs/
-│   ├── INTEGRATION.md                     # 合并说明、数据格式与运行方法
-│   ├── HYPERPARAMETER_SEARCH.md           # 两阶段超参数范围、运行方法与结果说明
-│   └── VALIDATION.md                      # 合并验证记录
 ├── scripts/
 │   ├── train_road_encoder.sh              # 道路编码器独立训练
 │   ├── train_model.sh                     # 整体模型联合训练
@@ -40,9 +44,7 @@ RCG-MTAD/
 │       ├── data/
 │       │   ├── __init__.py
 │       │   ├── labels.py                  # 健康、漏气、过热、不平衡的类别定义
-│       │   ├── end_to_end.py              # 原始多模态数据接口与划分校验
-│       │   ├── synchronized_samples.py    # 同步样本归档及 CSV 清单读取
-│       │   └── ttspd_multimodal_data.py   # 已有四状态 TTSPD 数据与固定划分读取
+│       │   └── dataloader.py              # 按目录配图、传感器缺值补零与 DataLoader
 │       ├── training/
 │       │   ├── __init__.py
 │       │   └── engine.py                  # 标准化、训练、验证与预测导出
@@ -56,8 +58,8 @@ RCG-MTAD/
 │           ├── infer_model.py             # 单检查点端到端推理入口
 │           └── infer_tire_classifier.py   # 原推理命令兼容入口
 └── tests/
-    ├── conftest.py                        # 测试环境配置
+    ├── conftest.py                        # 测试样本与运行配置
     ├── test_end_to_end.py                 # 联合训练、梯度与检查点测试
     ├── test_road_encoder.py               # 道路编码器测试
-    └── test_ttspd_raw_dataset.py          # TTSPD 原始数据与划分测试
+    └── test_dataloader.py                 # 目录配图、缺值补零及批量加载测试
 ```

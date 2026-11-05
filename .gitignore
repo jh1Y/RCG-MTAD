@@ -8,5 +8,7 @@ build/
 dist/
 /data/
 /models/
-/outputs/
+output/
+outputs/
+docs/
 /tmp/
